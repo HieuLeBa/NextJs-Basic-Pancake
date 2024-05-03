@@ -7,7 +7,7 @@ export default function Header() {
     <div>
       <ul>
         <li>
-          <Link href={"/login"}>Đăng ký</Link>
+          <Link href={"/login"}>Đăng nhập</Link>
         </li>
         <li>
           <Link href={"/register"}>Đăng ký</Link>

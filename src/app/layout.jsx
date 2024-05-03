@@ -2,6 +2,9 @@ import { Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import Header from "@/components/header";
 import "./globals.css";
+import { Toaster } from "@/components/ui/toaster";
+import AppProvider from "./AppProvider";
+import { cookies } from "next/headers";
 
 const inter = Inter({
   subsets: ["vietnamese"],
@@ -13,9 +16,12 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }) {
+  const sessionStore = cookies();
+  const sessionToken = sessionStore.get("sessionToken");
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
+        <Toaster />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -23,7 +29,9 @@ export default function RootLayout({ children }) {
           disableTransitionOnChange
         >
           <Header />
-          {children}
+          <AppProvider initialSessionToken={sessionToken?.value}>
+            {children}
+          </AppProvider>
         </ThemeProvider>
       </body>
     </html>
