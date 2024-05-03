@@ -5,7 +5,7 @@ import { useState } from "react";
 export default function AppProvider({ children, initialSessionToken }) {
   useState(() => {
     if (typeof window !== "undefined") {
-      clientSessionToken.set(initialSessionToken);
+      clientSessionToken.value = initialSessionToken;
     }
   });
   return { children };
