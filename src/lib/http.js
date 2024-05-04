@@ -2,8 +2,8 @@ import envConfig from "@/config";
 import { normalizePath } from "@/lib/utils";
 import { redirect } from "next/navigation";
 
-// const ENTITY_ERROR_STATUS = 422;
-// const AUTHENTICATION_ERROR_STATUS = 401;
+const ENTITY_ERROR_STATUS = 422;
+const AUTHENTICATION_ERROR_STATUS = 401;
 
 // export class HttpError extends Error {
 //   constructor({ status, payload }) {
@@ -132,7 +132,7 @@ import { redirect } from "next/navigation";
 
 // export default http;
 
-class HttpError extends Error {
+export class HttpError extends Error {
   constructor({ status, payload }) {
     super("Http Error");
     this.status = status;
@@ -150,6 +150,7 @@ export class EntityError extends HttpError {
 
 class SessionToken {
   token = "";
+  _expiresAt = new Date().toISOString();
   get value() {
     return this.token;
   }
@@ -159,22 +160,43 @@ class SessionToken {
     }
     this.token = token;
   }
+  get expiresAt() {
+    return this._expiresAt;
+  }
+  set expiresAt(expiresAt) {
+    if (typeof window === "undefined") {
+      throw new Error("Cannot set expiresAt on server side");
+    }
+    this._expiresAt = expiresAt;
+  }
 }
 
 export const clientSessionToken = new SessionToken();
 
+let clientLogoutRequest = null;
+
 const request = async (method, url, options) => {
-  const body =
-    options && options.body ? JSON.stringify(options.body) : undefined;
-  const baseHeaders = {
-    "Content-Type": "application/json",
-    Authorization: clientSessionToken.value
-      ? `Bearer ${clientSessionToken.value}`
-      : "",
-  };
+  const body = options?.body
+    ? options.body instanceof FormData
+      ? options.body
+      : JSON.stringify(options.body)
+    : undefined;
+  const baseHeaders =
+    body instanceof FormData
+      ? {
+          Authorization: clientSessionToken.value
+            ? `Bearer ${clientSessionToken.value}`
+            : "",
+        }
+      : {
+          "Content-Type": "application/json",
+          Authorization: clientSessionToken.value
+            ? `Bearer ${clientSessionToken.value}`
+            : "",
+        };
   const baseUrl =
-    options.baseUrl === undefined
-      ? process.env.NEXT_PUBLIC_API_ENDPOINT
+    options?.baseUrl === undefined
+      ? envConfig.NEXT_PUBLIC_API_ENDPOINT
       : options.baseUrl;
 
   const fullUrl = url.startsWith("/")
@@ -197,12 +219,43 @@ const request = async (method, url, options) => {
     payload,
   };
   if (!res.ok) {
-    throw new HttpError(data);
+    if (res.status === ENTITY_ERROR_STATUS) {
+      throw new EntityError(data);
+    } else if (res.status === AUTHENTICATION_ERROR_STATUS) {
+      if (typeof window !== "undefined") {
+        if (clientLogoutRequest) {
+          clientLogoutRequest = await fetch("/api/auth/logout", {
+            method: "POST",
+            body: JSON.stringify({ force: true }),
+            headers: { ...baseHeaders },
+          });
+          await clientLogoutRequest;
+          clientSessionToken.value = "";
+          clientSessionToken.expiresAt = new Date().toISOString();
+          clientLogoutRequest = null;
+          location.href = "/login";
+        }
+      } else {
+        const sessionToken =
+          options?.headers?.Authorization.split("Bearer ")[1];
+        redirect(`/logout?sessionToken=${sessionToken}`);
+      }
+    } else {
+      throw new HttpError(data);
+    }
   }
-  if (["/auth/login", "/auth/register"].includes(url)) {
-    clientSessionToken.value = payload.data.token;
-  } else if ("/auth/logout".includes(url)) {
-    clientSessionToken.value = "";
+  if (typeof window !== "undefined") {
+    if (
+      ["auth/login", "auth/register"].some(
+        (item) => item === normalizePath(url)
+      )
+    ) {
+      clientSessionToken.value = payload.data.token;
+      clientSessionToken.expiresAt = payload.data.expiresAt;
+    } else if ("auth/logout" === normalizePath(url)) {
+      clientSessionToken.value = "";
+      clientSessionToken.expiresAt = new Date().toISOString();
+    }
   }
   return data;
 };

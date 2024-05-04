@@ -1,7 +1,9 @@
+import { decodeJWT } from "@/lib/utils";
+
 export async function POST(request) {
-  const res = await request.json();
-  const sessionToken = res.sessionToken;
-  // const expiresAt = body.expiresAt;
+  const body = await request.json();
+  const sessionToken = body.sessionToken;
+  const expiresAt = body.expiresAt;
   if (!sessionToken) {
     return Response.json(
       { message: "Không nhận được session token" },
@@ -10,11 +12,12 @@ export async function POST(request) {
       }
     );
   }
-  // const expiresDate = new Date(expiresAt).toUTCString();
-  return Response.json(res, {
+
+  const expiresDate = new Date(expiresAt).toUTCString();
+  return Response.json(body, {
     status: 200,
     headers: {
-      "Set-Cookie": `sessionToken=${sessionToken}; Path=/; HttpOnly;`,
+      "Set-Cookie": `sessionToken=${sessionToken}; Path=/; HttpOnly; Expires=${expiresDate}; SameSite=Lax; Secure`,
     },
   });
 }

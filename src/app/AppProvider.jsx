@@ -8,5 +8,5 @@ export default function AppProvider({ children, initialSessionToken }) {
       clientSessionToken.value = initialSessionToken;
     }
   });
-  return { children };
+  return children;
 }

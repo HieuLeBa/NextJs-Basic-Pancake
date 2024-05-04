@@ -17,6 +17,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
 import authApiRequest from "@/apiRequests/auth";
 import { handleErrorApi } from "@/lib/utils";
+import { useState } from "react";
 
 export default function RegisterForm() {
   const [loading, setLoading] = useState(false);
@@ -38,10 +39,14 @@ export default function RegisterForm() {
     setLoading(true);
     try {
       const result = await authApiRequest.register(values);
+      await authApiRequest.auth({
+        sessionToken: result.payload.data.token,
+        expiresAt: result.payload.data.expiresAt,
+      });
       toast({
         description: result.payload.message,
       });
-      await authApiRequest.auth({ sessionToken: result.payload.data.token });
+
       router.push("/me");
     } catch (error) {
       handleErrorApi({
